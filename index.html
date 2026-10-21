@@ -2,12 +2,13 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- maximum-scale=1: iPhone không tự phóng to khi bấm vào ô nhập (đăng nhập xong bị zoom tràn màn hình). -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Quản lý thu chi – Nha Khoa Quỳnh Thư</title>
 <meta name="theme-color" content="#0b2a5b">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Thu chi">
@@ -83,6 +84,26 @@
     $('app').onload = () => { clearTimeout(timer); $('loading').hidden = true; $('blocked').hidden = true; };
     $('app').src = src;
   }
+
+  // Giữ hộ dữ liệu đăng nhập (token, tài khoản / mật khẩu ghi nhớ) cho app: iPhone hay xóa bộ nhớ của khung khác
+  // địa chỉ (app mở từ màn hình chính phải đăng nhập lại), còn bộ nhớ của chính trang github.io thì được giữ bền.
+  const BRIDGE_APP = 'thuchi', BRIDGE_PREFIX = 'qtcp_', STORE_KEY = 'bridge_' + BRIDGE_APP;
+  const readStore = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY) || '{}') || {}; } catch (e) { return {}; } };
+  const writeStore = o => { try { localStorage.setItem(STORE_KEY, JSON.stringify(o)); } catch (e) {} };
+  window.addEventListener('message', e => {
+    let host = '';
+    try { host = new URL(e.origin).hostname; } catch (err) { return; }
+    if (!/\.googleusercontent\.com$/.test(host)) return;   // chỉ nói chuyện với khung app của Google
+    const d = e.data || {};
+    if (d.app !== BRIDGE_APP) return;
+    if (d.type === 'store-get') {
+      e.source.postMessage({ type: 'store-data', app: BRIDGE_APP, items: readStore() }, e.origin);
+    } else if (d.type === 'store-set' && String(d.key).startsWith(BRIDGE_PREFIX)) {
+      const o = readStore(); o[d.key] = String(d.value); writeStore(o);
+    } else if (d.type === 'store-del' && String(d.key).startsWith(BRIDGE_PREFIX)) {
+      const o = readStore(); delete o[d.key]; writeStore(o);
+    }
+  });
 
   $('retry').onclick = start;
   start();
